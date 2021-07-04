@@ -6,8 +6,6 @@ const client = new Discord.Client(
 const config = require('./config.json');
 const commands = require(`./bin/commands`);
 
-commands.setRecordingDirectory(process.argv[3]);
-
 //in case the bot was not configured properly
 if(!config.PREFIX || !config.BOT_TOKEN) {
     console.error("Error: the configuration file was configured properly.");

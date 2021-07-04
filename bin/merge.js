@@ -1,9 +1,8 @@
 var fs = require('fs');
 
-const recordings = process.argv[3];
+const recordings = __dirname + '../recordings/';
 
-// This is one sample of silence
-const silence = '\0\0\0\0';
+const silence = '\0\0\0\0'; // This is one sample of silence
 const sampleRate = 48000;
 
 function getRecordingLength(size) {

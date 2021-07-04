@@ -1,16 +1,12 @@
 const fs = require('fs');
 
-var recordingDirectory = __dirname + '../recordings/'
-
-exports.setRecordingDirectory = function(path) {
-    recordingDirectory = path;
-}
+var recordingDirectory = __dirname + '../recordings/';
 
 const createNewChunk = (user) => {
-    const userDir = __dirname + `/${recordingDirectory}/${user.id}`;
+    const userDir = `/${recordingDirectory}/${user.id}`;
     const pathToFile = userDir + `/${Date.now()}.pcm`
     if (!fs.existsSync(userDir)) {
-        fs.mkdirSync(userDir)
+        fs.mkdirSync(userDir);
     }
     return fs.createWriteStream(pathToFile);
 };

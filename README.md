@@ -15,8 +15,6 @@ A [Discord.js](https://discord.js.org/#/) script which can record voice calls. S
 
 _**Note:** Recording voice calls without prior consent violates privacy. Do not use this bot without approval. I'm not responsible for your insanity._
 
-_Also, multi user recording is currently out of discord.js's scope, currently a unique stream is created for every user, but the end result is a very bad audio output, [more info](https://discordjs.guide/voice/receiving-audio.html#what-if-i-want-to-listen-to-multiple-users)._
-
 ## Installation and Usage
 
 Clone the repository : 
@@ -73,17 +71,19 @@ The bot should be online.
 
 ## Managing the Output
 
-The output for each piece of audio stream is written to a unique file in [PCM format](https://en.wikipedia.org/wiki/Pulse-code_modulation) (48000 Hz, signed 16-bit little-endian, 2 channel (stereo)) and saved to the `/recordings` directory.
+The output for each piece of audio stream is written to a unique file in [PCM format](https://en.wikipedia.org/wiki/Pulse-code_modulation) (48000 Hz, signed 16-bit little-endian, 2 channel (stereo)) and saved in the `/recordings` directory organized by user id (`/recordings/<USER_ID>/`).
 
 ### Merge Recording
 
-To merge all output files to `/recordings/merge.pcm`, run:
+To merge the output files, run:
 
 ```
 node /bin/merge.js
 ``` 
 
-**Note:** Empty your `recordings` folder (and remove `merge.pcm`) after each session. Running `./bin/merge.js` otherwise will dump large merge files.
+This will merge each user's audio clips into a single pcm file (`/recordings/<USER-ID>.pcm`) with all the proper delays to make all output files line up.
+
+**Note:** Empty your `recordings` folder after each session. Running `./bin/merge.js` otherwise will dump large merge files.
 
 ### Convert the Merged File to MP3
 
@@ -96,3 +96,13 @@ ffmpeg -f s16le -ar 48000 -ac 2 -i merge.pcm out.mp3
 
 Special thanks to [@eslachance](https://github.com/eslachance) for the [gist](https://gist.github.com/eslachance/fb70fc036183b7974d3b9191601846ba). It is what inspired me to make this repo.
 
+----
+
+## TODO
+
+In my fork of the repo, I plan to add a few features:
+
+* [X] Multi-User support
+* [ ] Automatically merge outputs after finishing a session
+* [ ] Convert the merged pcm files into a more standard file format such as .wav
+* [ ] Handle the exception that occurs when someone is in the middle of talking, and the exit command is called.
