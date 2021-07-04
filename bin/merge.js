@@ -1,27 +1,91 @@
-var fs = require('fs'),
-    chunks = fs.readdirSync(__dirname + '/../recordings'),
-    inputStream,
-    currentfile,
-    outputStream = fs.createWriteStream(__dirname + '/../recordings/merge.pcm');
+var fs = require('fs');
 
-chunks.sort((a, b) => { return a - b; });
+const recordings = process.argv[3];
 
-function appendFiles() {
+// This is one sample of silence
+const silence = '\0\0\0\0';
+const sampleRate = 48000;
+
+function getRecordingLength(size) {
+    return Math.round(size / 4) / sampleRate;
+}
+
+function generateSilence(first, last) {
+    return silence.repeat(((last - first) / 1000.0) * 48000);
+}
+
+function join(dir, path) {
+    if (dir.endsWith("/") || dir.endsWith("\\")) {
+        return dir + path;
+    }
+    return dir + "/" + path;
+}
+
+function appendFiles(lastTime, dir, chunks, outputStream, onComplete) {
     if (!chunks.length) {
-        outputStream.end(() => console.log('Finished.'));
+        onComplete();
         return;
     }
 
-    currentfile = `${__dirname}/../recordings/` + chunks.shift();
-    inputStream = fs.createReadStream(currentfile);
+    let filename = chunks.shift();
+    let currentFile = join(dir, filename);
+    let time = Number(filename.replace(".pcm", ""));
 
-    inputStream.pipe(outputStream, { end: false });
+    function pipe() {
+        let inputStream = fs.createReadStream(currentFile);
+        inputStream.pipe(outputStream, { end: false });
+        inputStream.on('end', function() {
+            let stat = fs.statSync(currentFile);
+            let length = getRecordingLength(stat.size);
+            appendFiles(time + length, dir, chunks, outputStream, onComplete);
+        });
+    }
 
-    inputStream.on('end', function() {
-        console.log(currentfile + ' appended');
-        appendFiles();
+    if (lastTime < time) {
+        outputStream.write(generateSilence(lastTime, time), () => {
+            pipe();
+        });
+    } else {
+        pipe();
+    }
+}
+
+function mergeFolder(earliest, path, output) {
+    let chunks = fs.readdirSync(path)
+    chunks.sort((a, b) => { return a - b});
+
+    console.log("Merging to " + output);
+    let outputStream = fs.createWriteStream(output);
+
+    appendFiles(earliest, path, chunks, outputStream, () => {
+        outputStream.end();
+        console.log("Completed " + output);
     });
 }
 
-appendFiles();
+var folders = fs.readdirSync(recordings);
+
+var earliest = NaN;
+
+for (let folder of folders) {
+    let path = join(recordings, folder);
+
+    if (fs.statSync(path).isDirectory()) {
+        let chunks = fs.readdirSync(path);
+        for (let chunk of chunks) {
+            let time = Number(chunk.replace(".pcm"));
+            earliest = Math.min(earliest, time);
+        }
+    }
+}
+
+for (let folder of folders) {
+    let path = join(recordings, folder);
+
+    if (fs.statSync(path).isDirectory()) {
+        console.log("Merging audio from " + folder);
+        mergeFolder(earliest, path, join(recordings, folder + ".pcm"));
+    }
+}
+
 

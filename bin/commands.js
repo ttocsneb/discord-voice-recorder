@@ -1,7 +1,17 @@
 const fs = require('fs');
 
-const createNewChunk = () => {
-    const pathToFile = __dirname + `/../recordings/${Date.now()}.pcm`;
+var recordingDirectory = __dirname + '../recordings/'
+
+exports.setRecordingDirectory = function(path) {
+    recordingDirectory = path;
+}
+
+const createNewChunk = (user) => {
+    const userDir = __dirname + `/${recordingDirectory}/${user.id}`;
+    const pathToFile = userDir + `/${Date.now()}.pcm`
+    if (!fs.existsSync(userDir)) {
+        fs.mkdirSync(userDir)
+    }
     return fs.createWriteStream(pathToFile);
 };
 
@@ -29,7 +39,7 @@ exports.enter = function(msg, channelName) {
                 if (speaking) {
                     console.log(`${user.username} started speaking`);
                     const audioStream = receiver.createStream(user, { mode: 'pcm' });
-                    audioStream.pipe(createNewChunk());
+                    audioStream.pipe(createNewChunk(user));
                     audioStream.on('end', () => { console.log(`${user.username} stopped speaking`); });
                 }
             });
