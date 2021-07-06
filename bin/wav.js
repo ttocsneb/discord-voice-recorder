@@ -25,14 +25,6 @@ function toBytes(text) {
     return bytes;
 }
 
-function repeat(arr, n) {
-    let result = [];
-    for (let i=0; i < n; i++) {
-        result.push(...arr);
-    }
-    return result;
-}
-
 function riff(id, size) {
     return [...toBytes(id), ...toDWord(size)];
 }
@@ -55,20 +47,25 @@ function pipeFile(fileName, outputStream, callback) {
 }
 
 exports.preprocess = function(silence, pcmFile) {
+    silence = Math.max(0, silence);
     let stats = fs.statSync(pcmFile);
-    let silentSamples = Math.round(silence / 1000 * samplesPerSec);
+    let silentSamples = Math.round(silence / 1000) * samplesPerSec;
     let time = stats.size / (bytesPerSample * channels) / samplesPerSec * 1000;
 
     return {
-        size: silentSamples * sampleSize + stats.size,
+        file: pcmFile,
+        silence,
+        size: 20 + stats.size,
+        dataSize: silentSamples * bytesPerSample + stats.size,
+        samples: silentSamples + stats.size / bytesPerSample,
         duration: Math.round(time)
     };
 }
 
-exports.appendPCM = function(silence, pcmFile, outputPCMStream, callback) {
+function appendPCM(data, outputPCMStream, callback) {
     function writePCM() {
-        pipeFile(pcmFile, outputPCMStream, () => {
-            fs.stat(pcmFile, (err, stats) => {
+        pipeFile(data.file, outputPCMStream, () => {
+            fs.stat(data.file, (err, stats) => {
                 let time = stats.size / (bytesPerSample * channels) / samplesPerSec * 1000;
                 callback(time);
             });
@@ -84,20 +81,38 @@ exports.appendPCM = function(silence, pcmFile, outputPCMStream, callback) {
             } else {
                 writePCM();
             }
-        })
+        });
     }
 
-    if (silence > 0) {
-        let silentSamples = Math.round(silence / 1000 * samplesPerSec);
-        writeSilence(silentSamples);
+    if (data.silence > 0) {
+        writeSilence(Math.round(data.silence / 1000) * samplesPerSec);
     } else {
         writePCM();
     }
 }
 
-exports.waveBuild = function(size, outputStream, callback) {
+exports.waveBuild = function(allData, outputStream, progressCb, callback) {
+    let size = 0;
+    for (let data of allData) {
+        size += data.size;
+    }
+    let progress = 0;
+
+    function writeData(index) {
+        if (index >= allData.length) {
+            callback();
+            return
+        }
+        appendPCM(allData[index], outputStream, () => {
+            progress += allData[index].size;
+            progressCb(progress / size);
+            writeData(index + 1);
+        })
+    }
+
     let wave = [...toBytes('WAVE'), ...waveFormat(), ...riff('data', size)]
     let header = [...riff('RIFF', size + wave.length), ...wave];
-
-    outputStream.write(Buffer.from(header), callback);
+    outputStream.write(Buffer.from(header), () => {
+        writeData(0);
+    });
 }

@@ -104,7 +104,7 @@ In my fork of the repo, I plan to add a few features:
 
 * [X] Multi-User support
 * [X] Merge directly into more portable audio formats (.wav)
-* [ ] Possibly use the slnt RIFF chunk in wav to allow for longer recordings 
-> Note: the slnt RIFF chunk is controversial in the wav format, and so may not be fully supported by all audio softwares. This should be ok as long as ffmpeg can process it into a compressed format (.mp3)
+* [ ] ~~Possibly use the slnt RIFF chunk in wav to allow for longer recordings ~~
+> slnt chunk is not supported by ffmpeg, and so I will not be implementing this
 * [ ] Automatically merge outputs after finishing a session
 * [ ] Handle the exception that occurs when someone is in the middle of talking, and the exit command is called.

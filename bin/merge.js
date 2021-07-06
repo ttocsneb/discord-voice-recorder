@@ -14,20 +14,23 @@ function join(root, ...paths) {
 
 const recordings = join(__dirname, '../recordings/');
 
-var totalFiles = 0;
-var processedFiles = 0;
+var percent = {};
 var lastPercent = NaN;
-var data = {};
 
-function updateProgress() {
-    processedFiles += 1;
-    let progress = Math.floor(processedFiles / totalFiles * 100);
-    if (progress != lastPercent) {
-        lastPercent = progress;
+function updateProgress(group, progress) {
+    percent[group] = progress;
+    let totalPercent = 0;
+    for (let groupPercent of Object.values(percent)) {
+        totalPercent += groupPercent;
+    }
+    totalPercent /= Object.values(percent).length;
+    totalPercent = Math.floor(totalPercent * 100);
+    if (totalPercent != lastPercent) {
+        lastPercent = totalPercent;
         process.stdout.clearLine();
         process.stdout.cursorTo(0);
-        let bar = Math.round(progress / 100 * 76);
-        let num = progress + "%";
+        let bar = Math.round(totalPercent / 100 * 76);
+        let num = totalPercent + "%";
         let progressBar = '='.repeat(bar) + ' '.repeat(76 - bar) + ' '.repeat(4 - num.length) + num;
         process.stdout.write(progressBar);
     }
@@ -38,59 +41,15 @@ function log(message) {
     console.log("\n" + message);
 }
 
-function appendFiles(lastTime, dir, chunks, outputStream, onComplete) {
-    if (!chunks.length) {
-        onComplete();
-        return;
-    }
-
-    let filename = chunks.shift();
-    let currentFile = join(dir, filename);
-    let time = Number(filename.replace(".pcm", ""));
-
-    wav.appendPCM(time - lastTime, currentFile, outputStream, (duration) => {
-        updateProgress();
-        appendFiles(time + duration, dir, chunks, outputStream, onComplete);
-    });
-}
-
 function mergeFolder(data, callback) {
     let outputStream = fs.createWriteStream(data.file);
 
-    function appendChunk(index) {
-        if (index >= data.chunks.length) {
-            outputStream.end(callback);
-            return;
-        }
-        wav.appendPCM(data.chunks[index].silence, data.chunks[index].file, outputStream, () => {
-            updateProgress();
-            appendChunk(index + 1);
-        });
-    }
-    wav.waveBuild(data.size, outputStream, () => {
-        appendChunk(0);
-    })
+    wav.waveBuild(data.chunks, outputStream, (progress) => {
+        updateProgress(data.file, progress);
+    }, () => {
+        outputStream.end(callback);
+    });
 }
-
-// function mergeFolder(earliest, path, output) {
-//     let chunks = fs.readdirSync(path)
-//     chunks.sort((a, b) => { return a - b});
-
-//     console.log("Merging to " + output);
-//     let tmpFile = output + '.pcm';
-//     let tempStream = fs.createWriteStream(tmpFile);
-
-//     appendFiles(earliest, path, chunks, tempStream, () => {
-//         tempStream.end(() => {
-//             wav.waveBuild(tmpFile, output, () => {
-//                 fs.rm(tmpFile, () => {
-//                     updateProgress();
-//                     log("Completed " + output);
-//                 });
-//             });
-//         });
-//     });
-// }
 
 var folders = fs.readdirSync(recordings);
 
@@ -105,7 +64,6 @@ for (let folder of folders) {
         let chunks = fs.readdirSync(path);
         stats[folder].chunks = chunks;
         stats[folder].chunks.sort((a, b) => { return a - b});
-        totalFiles += chunks.length + 1;
 
         let time = Number(stats[folder].chunks[0].replace(".pcm", ''));
         earliest = Math.min(earliest, time);
@@ -125,10 +83,7 @@ for (let [folder, data] of Object.entries(stats)) {
             continue;
         }
         data.size += stat.size;
-        newChunks.push({
-            file,
-            silence: time - lastTime
-        });
+        newChunks.push(stat);
         lastTime = time + stat.duration;
     }
     data.chunks = newChunks;
@@ -138,17 +93,6 @@ for (let [folder, data] of Object.entries(stats)) {
 for (let [folder, data] of Object.entries(stats)) {
     console.log(`Processing ${folder}`);
     mergeFolder(data, () => {
-        updateProgress();
         log(`Finished processing ${folder}`);
     });
 }
-
-// for (let folder of folders) {
-//     let path = join(recordings, folder);
-
-//     if (fs.statSync(path).isDirectory()) {
-//         mergeFolder(earliest, path, join(recordings, folder + ".wav"));
-//     }
-// }
-
-
